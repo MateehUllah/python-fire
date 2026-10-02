@@ -853,6 +853,7 @@ def _ParseKeywordArgs(args, fn_spec):
     return kwargs, remaining_kwargs, remaining_args
 
   skip_argument = False
+  positional_args_seen = 0
 
   for index, argument in enumerate(args):
     if skip_argument:
@@ -923,11 +924,19 @@ def _ParseKeywordArgs(args, fn_spec):
         value = args[index + 1]
         got_argument = True
 
+      # If a positional argument already appeared for this parameter, leave
+      # this flag for a later component in a chained command. Likewise, keep
+      # duplicate flags after the first occurrence so they are not silently
+      # reassigned to the current callable.
+      positional_fills_keyword = (
+          keyword in fn_args and fn_args.index(keyword) < positional_args_seen)
+      duplicate_keyword = keyword in kwargs
+
       # In order for us to consume the argument as a keyword arg, we either:
       # Need to be explicitly expecting the keyword, or we need to be
       # accepting **kwargs.
       skip_argument = not contains_equals and not is_bool_syntax
-      if got_argument:
+      if got_argument and not positional_fills_keyword and not duplicate_keyword:
         kwargs[keyword] = value
       else:
         remaining_kwargs.append(argument)
@@ -935,6 +944,7 @@ def _ParseKeywordArgs(args, fn_spec):
           remaining_kwargs.append(args[index + 1])
     else:  # not _IsFlag(argument)
       remaining_args.append(argument)
+      positional_args_seen += 1
 
   return kwargs, remaining_kwargs, remaining_args
 
